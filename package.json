@@ -1,0 +1,29 @@
+{
+  "name": "npm-all-downloads",
+  "version": "0.0.0",
+  "description": "",
+  "main": "npm-all-downloads.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "JSONStream": "~0.8.4",
+    "after": "~0.8.1",
+    "bole": "~1.0.0",
+    "bytewise": "~0.7.1",
+    "function-rate-limit": "0.0.1",
+    "humanize-number": "0.0.2",
+    "hyperquest": "~0.3.0",
+    "level": "~0.18.0",
+    "level-sublevel": "~6.2.0",
+    "list-stream": "0.0.1",
+    "moment": "~2.7.0",
+    "node-uuid": "~1.4.1",
+    "npm-download-counts": "~0.1.1",
+    "routes-router": "~4.1.0",
+    "send-data": "~3.3.2",
+    "through2": "~0.5.1"
+  }
+}
