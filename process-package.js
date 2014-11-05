@@ -2,21 +2,16 @@ const rateLimit      = require('function-rate-limit')
     , downloads      = require('npm-download-counts')
     , listStream     = require('list-stream')
     , moment         = require('moment')
+    , log            = require('bole')('process-packages')
     , db             = require('./db')
     , sumPackage     = require('./sum-package')
-    , updaterLog     = require('bole')('updater')
 
-
-      // rate-limit the data-fetch to 100,000 calls in a 6h period
-    , period         = 6 * 60 * 60 * 1000
+    , period         = 5 * 60 * 60 * 1000
     , downloadsLimit = rateLimit(100000, period, downloads)
 
 
 function lastDate (pkg, callback) {
-  var pkgCountDb = db.packageCountDb(pkg)
-
   function collected (err, data) {
-    //console.log('lastDate', arguments)
     if (err)
       return callback(err)
 
@@ -24,20 +19,21 @@ function lastDate (pkg, callback) {
   }
 
   try {
-    pkgCountDb.createReadStream({ reverse: true, limit: 1 }).pipe(listStream.obj(collected))
+    db.packageCountDb(pkg).createReadStream({ reverse: true, limit: 1 }).pipe(listStream.obj(collected))
   } catch (e) {
-    updaterLog.error(e)
+    log.error('createReadStream error for', pkg)
+    log.error(e.stack)
     callback()
   }
 }
 
 
-function save (pkg, batch, callback) {
+function save (date, pkg, batch, callback) {
   db.packageCountDb(pkg).batch(batch, function (err) {
     if (err)
-      updaterLog.error(err, 'Error saving count data for ' + pkg + ': ' + err.message)
+      log.error('Error saving count data for %s: %s', pkg, err.message)
 
-    sumPackage(pkg, callback)
+    sumPackage(date, pkg, callback)
   })
 }
 
@@ -54,7 +50,7 @@ function downloadDataToBatch (start, end, data) {
     return p
   }, {})
 
-  while (day <= end) {
+  while (day < end) {
     dayS = day.format('YYYY-MM-DD')
     batch.push({ type: 'put', key: dayS, value: dataMap[dayS] || 0 })
     day = day.add('days', 1)
@@ -69,7 +65,7 @@ function processPackage (date, pkg, callback) {
 
   function fetchSince (err, lastDate) {
     if (err) {
-      updaterLog.error(err, 'Last-date fetch error for for ' + pkg + ': ' + err.message)
+      log.error('Last-date fetch error for for %s: %s', pkg, err.message)
       return callback()
     }
 
@@ -77,7 +73,7 @@ function processPackage (date, pkg, callback) {
       , end   = moment(date).zone(0).subtract('day', 1)
 
     if (start.isSame(end, 'day') || start.isAfter(end, 'day'))
-      return sumPackage(pkg, callback)
+      return sumPackage(date, pkg, callback)
 
     start = start.subtract('days', 5) // back up a bit just to make sure we have it all
 
@@ -85,21 +81,21 @@ function processPackage (date, pkg, callback) {
 
     function counts (err, data) {
       if (err) {
-        updaterLog.error(err, 'Count fetch error for %s: %s', pkg, err.message)
+        log.error('Count fetch error for %s: %s', pkg, err.message)
         if (!/no stats for this package for this range/.test(err.message))
-          return sumPackage(pkg, callback)
+          return sumPackage(date, pkg, callback)
         else
           data = [] // no stats, so zero fill
       }
 
       if (!Array.isArray(data)) {
-        updaterLog.error(new Error('Unexpected count data for ' + pkg + ': ' + JSON.stringify(data)))
-        return sumPackage(pkg, callback)
+        log.error('Unexpected count data for %s: %s', pkg, JSON.stringify(data))
+        return sumPackage(date, pkg, callback)
       }
 
       var batch = downloadDataToBatch(start, end, data)
 
-      save(pkg, batch, callback)
+      save(date, pkg, batch, callback)
     }
   }
 }

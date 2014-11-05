@@ -1,36 +1,58 @@
-const db         = require('./db')
-    , moment     = require('moment')
-    , through2   = require('through2')
-    , updaterLog = require('bole')('updater')
+const db       = require('./db')
+    , moment   = require('moment')
+    , through2 = require('through2')
+    , log      = require('bole')('calculate-ranks')
 
 
 function calculateRanks (date, total, callback) {
-  var dateStr = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
-  var dsumDb  = db.dateSumDb(dateStr)
-    , pos     = 1
+  var dateStr   = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
+    , dsumDb    = db.dateSumDb(dateStr)
+    , pos       = 1
+    , lastCount = -1
+    , lastRank  = -1
 
-  function process (data, enc, callback) {
+  function process (_data, enc, callback) {
+    var data  = JSON.parse(_data)
+      , count = data.count
+        // if the count for this pkg is same as the last then they have
+        // the same rank, but we still increment 'pos' so there will
+        // be blank ranks because of the duplicates
+      , rank  = count === lastCount ? lastRank : pos
+      , value = {
+          rank  : rank
+        , total : total
+        , count : count
+        , date  : dateStr
+      }
+
     db.packageDb.put(
         data['package']
-      , { rank: pos, total: total, date: dateStr }
-      , { valueEncoding: 'json' }
+      , JSON.stringify(value)
       , function (err) {
           if (err)
-            updaterLog.error(new Error('Error writing ranking data for ' + data.package + ':' + err.message))
+            log.error(new Error('Error writing ranking data for ' + data.package + ':' + err.message))
           callback()
         }
     )
+
     pos++
+    lastRank  = rank
+    lastCount = count
   }
 
   function onErrorOrEnd (err) {
     if (err)
-      updaterLog.error(err)
+      log.error(err)
+    else
+      log.debug('Finished ranking %d packages', pos - 1)
+
     callback && callback(err)
     callback = null
   }
 
-  dsumDb.createValueStream({ reverse: true, valueEncoding: 'json' })
+  log.debug('Calculating rankings for %s', dateStr)
+
+  dsumDb.createValueStream({ reverse: true })
     .on('error', onErrorOrEnd)
     .pipe(through2.obj(process))
     .on('error', onErrorOrEnd)

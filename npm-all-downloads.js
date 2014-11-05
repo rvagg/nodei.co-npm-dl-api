@@ -1,9 +1,10 @@
 const moment         = require('moment')
     , through2       = require('through2')
+    , log            = require('bole')('npm-all-downloads')
+    , listPackages   = require('./npm-list-packages')
     , db             = require('./db')
     , calculateRanks = require('./calculate-ranks')
     , processPackage = require('./process-package')
-    , updaterLog     = require('bole')('updater')
 
 
 function processAllPackages (callback) {
@@ -19,44 +20,47 @@ function processAllPackages (callback) {
         batch.push({ type: 'del', key: key })
       })
       .on('end', function () {
-        updaterLog.debug('Deleting %d entries', batch.length)
+        log.debug('Deleting %d entries from sum database @ %s', batch.length, end)
         dsumDb.batch(batch, callback)
       })
   }
 
   function run () {
-    var processed = 0
+    var processed    = 0
+      , packageCount = 0
 
-    function onError (err) {
-      callback && callback(err)
-      callback = null
-    }
+    function onPackage (pkg, enc, _callback) {
+      var self = this
 
-    function onFinish () {
-      if (callback)
-        calculateRanks(date, processed, callback)
-    }
+      packageCount++
 
-    function onData (pkg, _, cb) {
       processPackage(date, pkg, function (err, count) {
-        if (err)
-          return cb(err)
+        processed++
 
-        updaterLog.debug(
-            '%d: %s count = %s'
-          , ++processed
-          , pkg
-          , isFinite(count) ? String(count) : 'unknown'
-        )
-        cb()
+        if (err)
+          log.error(err)
+        else
+          log.debug({ number: processed, 'package': pkg, count: isFinite(count) ? String(count) : 'unknown' })
+
+        if (!err)
+          return _callback()
+
+        self.push(null)
+
+        callback && callback(err)
+        callback = null
       })
     }
 
-    db.packageDb.createKeyStream({ keyEncoding: 'utf8' })
-      .on('error', onError)
-      .pipe(through2.obj({ highWaterMark: 4 }, onData))
-      .on('error', onError)
-      .on('finish', onFinish)
+    function onEnd (_callback) {
+      if (callback)
+        calculateRanks(date, packageCount, callback)
+
+      _callback()
+    }
+
+    db.packageDb.createKeyStream()
+      .pipe(through2.obj(onPackage, onEnd))
   }
 
   clean(run)

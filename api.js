@@ -4,33 +4,58 @@ const moment     = require('moment')
 
 
 function pkgRank (pkg, callback) {
-  db.packageDb.get(pkg, { valueEncoding: 'json' }, callback)
+  db.packageDb.get(pkg, function (err, data) {
+    if (err)
+      return callback(err)
+
+    callback(null, JSON.parse(data))
+  })
 }
 
 
-function pkgDownloads (pkg, days, callback) {
+function _pkgDownloadDays (pkg, days, callback) {
   var pkgCountDb = db.packageCountDb(pkg)
     , start      = moment().zone(0).subtract('days', days + 1).format('YYYY-MM-DD')
     , end        = moment().zone(0).subtract('days', 1).format('YYYY-MM-DD')
 
   function onErrorOrEnd (err, data) {
-    if (!callback)
-      return
-    if (err) {
-      callback(err)
-    } else if (data) {
-      callback(null, data.map(function (d) {
-        return { day: d.key, count: parseInt(d.value, 10) }
-      }))
-    }
+    callback && callback(err, data)
     callback = null
   }
 
   pkgCountDb
-    .createReadStream({ gte: start, lt: end, valueEncoding: 'json' })
+    .createReadStream({ gte: start, lt: end })
     .on('error', onErrorOrEnd)
     .pipe(listStream.obj(onErrorOrEnd))
     .on('error', onErrorOrEnd)
+}
+
+
+function pkgDownloadDays (pkg, days, callback) {
+  _pkgDownloadDays(pkg, days, function (err, data) {
+    if (err)
+      return callback(err)
+
+    var _data = data.map(function (d) {
+      return { day: d.key, count: parseInt(d.value, 10) }
+    })
+
+    callback(null, _data)
+  })
+}
+
+
+function pkgDownloadSum (pkg, days, callback) {
+  _pkgDownloadDays(pkg, days, function (err, data) {
+    if (err)
+      return callback(err)
+
+    var sum = data.reduce(function (p, c) {
+      return p + parseInt(c.value, 10)
+    }, 0)
+
+    callback(null, sum)
+  })
 }
 
 
@@ -43,19 +68,25 @@ function topDownloads (count, callback) {
     if (err) {
       callback(err)
     } else if (data) {
+      data = data.map(function (_d, i) {
+        var d = JSON.parse(_d)
+        d.rank = i + 1
+        return d
+      })
       callback(null, data)
     }
     callback = null
   }
 
   dsumDb
-    .createValueStream({ reverse: true, valueEncoding: 'json', limit: count })
+    .createValueStream({ reverse: true, limit: count })
     .on('error', onErrorOrEnd)
     .pipe(listStream.obj(onErrorOrEnd))
     .on('error', onErrorOrEnd)
 }
 
 
-module.exports.pkgRank      = pkgRank
-module.exports.pkgDownloads = pkgDownloads
-module.exports.topDownloads = topDownloads
+module.exports.pkgRank         = pkgRank
+module.exports.pkgDownloadDays = pkgDownloadDays
+module.exports.pkgDownloadSum  = pkgDownloadSum
+module.exports.topDownloads    = topDownloads

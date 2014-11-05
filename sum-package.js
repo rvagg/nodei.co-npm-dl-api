@@ -1,8 +1,8 @@
 const moment     = require('moment')
     , after      = require('after')
     , listStream = require('list-stream')
+    , log        = require('bole')('sum-package')
     , db         = require('./db')
-    , updaterLog = require('bole')('updater')
 
     , avgPeriod  = 30
 
@@ -13,10 +13,10 @@ function sumKey (i) {
 }
 
 
-function sumPackage (pkg, callback) {
+function sumPackage (date, pkg, callback) {
   var pkgCountDb = db.packageCountDb(pkg)
-    , start      = moment().zone(0).subtract('days', avgPeriod + 1).format('YYYY-MM-DD')
-    , end        = moment().zone(0).subtract('days', 1).format('YYYY-MM-DD')
+    , start      = moment(date).zone(0).subtract('days', avgPeriod + 1).format('YYYY-MM-DD')
+    , end        = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
     , dsumDb     = db.dateSumDb(end)
     , done       = after(2, function (err) { callback(err, count) })
     , count
@@ -28,25 +28,19 @@ function sumPackage (pkg, callback) {
 
     dsumDb.put(
         sumKey(count) + '!' + pkg
-      , { 'package': pkg, count: count }
-      , { valueEncoding: 'json' }
+      , JSON.stringify({ 'package': pkg, count: count })
       , done
     )
-    db.packageDateDb(end).put(pkg, count, done)
-  }
-  
-  function onError (err) {
-    updaterLog.error(err)
+    db.packageDateDb(end).put(pkg, String(count), done)
   }
 
+  //log.debug('Calculating %d day sums for %s', avgPeriod, end)
+
   try {
-    pkgCountDb
-      .createReadStream({ gte: start, lt: end })
-      .on('error', onError)
-      .pipe(listStream.obj(collected))
-      .on('error', onError)
+    pkgCountDb.createReadStream({ gte: start, lt: end }).pipe(listStream.obj(collected))
   } catch (e) {
-    updaterLog.error(e)
+    log.error('createReadStream error for', pkg)
+    log.error(e.stack)
     callback()
   }
 }

@@ -6,6 +6,7 @@ const http           = require('http')
     , bole           = require('bole')
     , uuid           = require('node-uuid')
     , sendJson       = require('send-data/json')
+    , sendPlain      = require('send-data/plain')
     , sendError      = require('send-data/error')
     , allDownloads   = require('./npm-all-downloads')
     , updatePackages = require('./update-package-list')
@@ -53,18 +54,36 @@ function sendData (req, res) {
 
 
 function pkgRankRoute (req, res, opts) {
+  res.setHeader('cache-control', 'no-cache')
   api.pkgRank(opts.params.pkg, sendData(req, res))
 }
 
 
-function pkgDownloadsRoute (req, res, opts) {
+function _pkgDownloadsPreRoute (req, res, opts, route) {
   var qs   = querystring.parse(url.parse(req.url).query)
     , days = parseInt(qs.days || 30, 10)
 
   if (days < 1 || days > 365)
     days = 30
 
-  api.pkgDownloads(opts.params.pkg, days, sendData(req, res))
+  opts.days = days
+
+  res.setHeader('cache-control', 'no-cache')
+  route()
+}
+
+
+function pkgDownloadSumRoute (req, res, opts) {
+  _pkgDownloadsPreRoute(req, res, opts, function () {
+    api.pkgDownloadSum(opts.params.pkg, opts.days, sendData(req, res))
+  })
+}
+
+
+function pkgDownloadDaysRoute (req, res, opts) {
+  _pkgDownloadsPreRoute(req, res, opts, function () {
+    api.pkgDownloadDays(opts.params.pkg, opts.days, sendData(req, res))
+  })
 }
 
 
@@ -75,6 +94,7 @@ function topDownloadsRoute (req, res) {
   if (count < 1 || count > 500)
     count = 50
 
+  res.setHeader('cache-control', 'no-cache')
   api.topDownloads(count, sendData(req, res))
 }
 
@@ -94,14 +114,15 @@ var router = Router({
 })
 
 
-router.addRoute('/rank/:pkg', pkgRankRoute)
-router.addRoute('/downloads/:pkg', pkgDownloadsRoute)
-router.addRoute('/top', topDownloadsRoute)
+router.addRoute('/rank/:pkg'          , pkgRankRoute)
+router.addRoute('/download-sum/:pkg'  , pkgDownloadSumRoute)
+router.addRoute('/download-days/:pkg' , pkgDownloadDaysRoute)
+router.addRoute('/top'                , topDownloadsRoute)
 
 
 function handler (req, res) {
   if (req.url == '/_status')
-    return sendJson(req, res, { body: { ok: true }, statusCode: 200 })
+    return sendPlain(req, res, 'OK')
 
   // unique logger for each request
   req.log = reqLog(uuid.v4())
@@ -155,4 +176,5 @@ function periodic () {
 
 
 setInterval(periodic, periodicInterval)
+
 setTimeout(periodic, 1000 * 60)
