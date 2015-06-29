@@ -22,6 +22,9 @@ const http           = require('http')
 
     , periodicInterval = 1000 * 60 * 60 * 12
 
+    // inherited from nodei.co/lib/valid-name.js
+    , pkgregex       = '@?\\w*/?[^/@\\s\\+%:]+'
+
 
 bole.output({
   level  : isDev ? 'debug' : 'info',
@@ -114,10 +117,10 @@ var router = Router({
 })
 
 
-router.addRoute('/rank/:pkg'          , pkgRankRoute)
-router.addRoute('/download-sum/:pkg'  , pkgDownloadSumRoute)
-router.addRoute('/download-days/:pkg' , pkgDownloadDaysRoute)
-router.addRoute('/top'                , topDownloadsRoute)
+router.addRoute(`/rank/:pkg(${pkgregex})`          , pkgRankRoute)
+router.addRoute(`/download-sum/:pkg(${pkgregex})`  , pkgDownloadSumRoute)
+router.addRoute(`/download-days/:pkg(${pkgregex})` , pkgDownloadDaysRoute)
+router.addRoute('/top'                             , topDownloadsRoute)
 
 
 function handler (req, res) {

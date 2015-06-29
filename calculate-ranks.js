@@ -5,7 +5,7 @@ const db       = require('./db')
 
 
 function calculateRanks (date, total, callback) {
-  var dateStr   = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
+  var dateStr   = moment(date).utcOffset(0).subtract(1, 'days').format('YYYY-MM-DD')
     , dsumDb    = db.dateSumDb(dateStr)
     , pos       = 1
     , lastCount = -1

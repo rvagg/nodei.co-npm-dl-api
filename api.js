@@ -5,8 +5,11 @@ const moment     = require('moment')
 
 function pkgRank (pkg, callback) {
   db.packageDb.get(pkg, function (err, data) {
-    if (err)
+    if (err) {
+      if (err.notFound)
+        return callback(null, '')
       return callback(err)
+    }
 
     callback(null, JSON.parse(data))
   })
@@ -15,8 +18,8 @@ function pkgRank (pkg, callback) {
 
 function _pkgDownloadDays (pkg, days, callback) {
   var pkgCountDb = db.packageCountDb(pkg)
-    , start      = moment().zone(0).subtract('days', days + 1).format('YYYY-MM-DD')
-    , end        = moment().zone(0).subtract('days', 1).format('YYYY-MM-DD')
+    , start      = moment().utcOffset(0).subtract(days + 1, 'days').format('YYYY-MM-DD')
+    , end        = moment().utcOffset(0).subtract(1, 'days').format('YYYY-MM-DD')
 
   function onErrorOrEnd (err, data) {
     callback && callback(err, data)
@@ -60,7 +63,7 @@ function pkgDownloadSum (pkg, days, callback) {
 
 
 function topDownloads (count, callback) {
-  var dsumDb = db.dateSumDb(moment().zone(0).subtract('days', 1).format('YYYY-MM-DD'))
+  var dsumDb = db.dateSumDb(moment().utcOffset(0).subtract(1, 'days').format('YYYY-MM-DD'))
 
   function onErrorOrEnd (err, data) {
     if (!callback)

@@ -11,7 +11,7 @@ function processAllPackages (callback) {
   var date = new Date()
 
   function clean (callback) {
-    var end    = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
+    var end    = moment(date).utcOffset(0).subtract(1, 'days').format('YYYY-MM-DD')
       , dsumDb = db.dateSumDb(end)
       , batch  = []
 

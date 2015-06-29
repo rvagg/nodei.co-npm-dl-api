@@ -15,8 +15,8 @@ function sumKey (i) {
 
 function sumPackage (date, pkg, callback) {
   var pkgCountDb = db.packageCountDb(pkg)
-    , start      = moment(date).zone(0).subtract('days', avgPeriod + 1).format('YYYY-MM-DD')
-    , end        = moment(date).zone(0).subtract('days', 1).format('YYYY-MM-DD')
+    , start      = moment(date).utcOffset(0).subtract(avgPeriod + 1, 'days').format('YYYY-MM-DD')
+    , end        = moment(date).utcOffset(0).subtract(1, 'days').format('YYYY-MM-DD')
     , dsumDb     = db.dateSumDb(end)
     , done       = after(2, function (err) { callback(err, count) })
     , count
