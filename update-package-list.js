@@ -1,42 +1,45 @@
-const through2     = require('through2')
-    , log          = require('bole')('process-packages')
+'use strict'
+
+const log          = require('bole')('process-packages')
     , listPackages = require('./npm-list-packages')
     , db           = require('./db')
 
 
 function updatePackageList (callback) {
-  var packages = listPackages()
-
-  function savePackage (pkg, _, callback) {
-    db.packageDb.get(pkg, function (err) {
-      if (err && err.notFound) {
-        db.packageDb.put(pkg, '{}', function (err) {
-          callback(err)
-        })
-      } else {
-        callback(err)
-      }
+  function savePackage (pkg, callback) {
+    db.packageDb.get(pkg, (err) => {
+      if (err && err.notFound)
+        return db.packageDb.put(pkg, '{}', callback)
+      callback(err)
     })
   }
 
-  function onErrorOrEnd (err) {
+  log.debug('Updating package list from npm')
+
+  listPackages((err, names) => {
     if (err)
       log.error(err)
     else
       log.debug('Completed package list update from npm')
 
-    callback && callback(err)
-    callback = null
-  }
+    let i = 0
 
-  log.debug('Updating package list from npm')
+    function save (err) {
+      if (err)
+        throw new Error(`Error saving package ${err.message}`)
 
-  packages
-    .on('error', onErrorOrEnd)
-    .pipe(through2.obj(savePackage))
-    .on('error', onErrorOrEnd)
-    .on('finish', onErrorOrEnd)
+      if (++i == names.length)
+        return callback()
+
+      savePackage(names[i], save)
+    }
+
+    save()
+  })
 }
 
 
 module.exports = updatePackageList
+
+if (require.main === module)
+  updatePackageList(() => {})

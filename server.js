@@ -1,3 +1,5 @@
+'use strict'
+
 const http           = require('http')
     , fs             = require('fs')
     , url            = require('url')
@@ -8,19 +10,15 @@ const http           = require('http')
     , sendJson       = require('send-data/json')
     , sendPlain      = require('send-data/plain')
     , sendError      = require('send-data/error')
-    , allDownloads   = require('./npm-all-downloads')
-    , updatePackages = require('./update-package-list')
     , api            = require('./api')
 
     , log            = bole('server')
     , reqLog         = bole('server:request')
-    , updaterLog     = bole('updater')
 
     , isDev          = (/^dev/i).test(process.env.NODE_ENV)
     , port           = process.env.PORT || 3000
     , start          = new Date()
 
-    , periodicInterval = 1000 * 60 * 60 * 12
 
     // inherited from nodei.co/lib/valid-name.js
     , pkgregex       = '@?\\w*/?[^/@\\s\\+%:]+'
@@ -32,7 +30,7 @@ bole.output({
 })
 
 if (process.env.LOG_FILE) {
-  console.log('Starting logging to %s', process.env.LOG_FILE)
+  console.log(`Starting logging to ${process.env.LOG_FILE}`)
   bole.output({
     level  : 'debug',
     stream : fs.createWriteStream(process.env.LOG_FILE)
@@ -40,7 +38,7 @@ if (process.env.LOG_FILE) {
 }
 
 
-process.on('uncaughtException', function (err) {
+process.on('uncaughtException', (err) => {
   log.error(err)
   process.exit(1)
 })
@@ -63,7 +61,7 @@ function pkgRankRoute (req, res, opts) {
 
 
 function _pkgDownloadsPreRoute (req, res, opts, route) {
-  var qs   = querystring.parse(url.parse(req.url).query)
+  let qs   = querystring.parse(url.parse(req.url).query)
     , days = parseInt(qs.days || 30, 10)
 
   if (days < 1 || days > 365)
@@ -91,7 +89,7 @@ function pkgDownloadDaysRoute (req, res, opts) {
 
 
 function topDownloadsRoute (req, res) {
-  var qs    = querystring.parse(url.parse(req.url).query)
+  let qs    = querystring.parse(url.parse(req.url).query)
     , count = parseInt(qs.count || 50, 10)
 
   if (count < 1 || count > 500)
@@ -102,7 +100,7 @@ function topDownloadsRoute (req, res) {
 }
 
 
-var router = Router({
+const router = Router({
     errorHandler: function (req, res, err) {
       req.log.error(err)
       sendError(req, res, err)
@@ -139,45 +137,21 @@ function handler (req, res) {
 
 
 http.createServer(handler)
-  .on('error', function (err) {
+  .on('error', (err) => {
     log.error(err)
     throw err
   })
-  .listen(port, function (err) {
+  .listen(port, (err) => {
     if (err) {
       log.error(err)
       throw err
     }
 
-    log.info('Server started on port %d', port)
+    log.info(`Server started on port ${port}`)
     console.log()
     console.log('>> Running: http://localhost:' + port)
     console.log()
   })
 
 
-function periodic () {
-  var start = Date.now()
-  updaterLog.info('Starting periodic update')
-
-  updatePackages(function (err) {
-    if (err) {
-      updaterLog.error(err)
-      return process.exit(1)
-    }
-
-    allDownloads.processAllPackages(function (err) {
-      if (err) {
-        updaterLog.error(err)
-        return process.exit(1)
-      }
-
-      updaterLog.info('Finished periodic update, took % seconds', Date.now() - start)
-    })
-  })
-}
-
-
-setInterval(periodic, periodicInterval)
-
-setTimeout(periodic, 1000 * 60)
+require('./periodic')

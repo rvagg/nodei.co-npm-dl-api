@@ -1,20 +1,46 @@
+'use strict'
+
 const hyperquest = require('hyperquest')
-    , JSONStream = require('JSONStream')
+    , bl         = require('bl')
+    , fs         = require('fs')
 
 
-const ALL_PACKAGES_URL = 'https://registry.npmjs.org/-/all' //?limit=1000'
+const allPackagesUrl = 'https://registry.npmjs.org/-/all/static/all.json?limit=1000'
+    , debugSource    = `${__dirname}/all.json`
 
 
 // load the list of all npm libs with 'repo' pointing to GitHub
-function listPackages () {
-  var stream = JSONStream.parse('*.name')
+function listPackages (callback) {
+  function source () {
+    if (process.env.DEBUG && fs.statSync(debugSource))
+      return fs.createReadStream(debugSource)
+    return hyperquest(allPackagesUrl)
+  }
 
-  hyperquest(ALL_PACKAGES_URL)
-    .on('error', stream.emit.bind(stream, 'error'))
-    .pipe(stream)
+  source().pipe(bl((err, data) => {
+    if (err)
+      return callback(err)
 
-  return stream
+    let packages
+
+    try {
+      packages = JSON.parse(data.toString())
+    } catch (e) {
+      return  callback(e)
+    }
+
+    let names = Object.keys(packages).filter((name) => {
+      let versions = packages[name].versions
+      return versions && Object.keys(versions).length > 0
+    })
+
+    callback(null, names)
+  }))
 }
 
 
 module.exports = listPackages
+
+
+if (require.main === module)
+  listPackages((err, names) => console.log(`${names.length} packages`))

@@ -1,12 +1,11 @@
 const level  = require('level')
     , spaces = require('level-spaces')
-    , moment = require('moment')
 
 
-var db        = level('./counts.db', { keyEncoding: 'utf8' })
-  , packageDb = spaces(db, 'package', { keyEncoding: 'utf8' })
-  , countDb   = spaces(db, 'count', { keyEncoding: 'utf8' })
-  , sumDb     = spaces(db, 'sum', { keyEncoding: 'utf8' })
+const db        = level('./counts.db', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
+    , packageDb = spaces(db, 'package', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
+    , countDb   = spaces(db, 'count', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
+    , sumDb     = spaces(db, 'sum', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
 
 
 module.exports.db        = db
