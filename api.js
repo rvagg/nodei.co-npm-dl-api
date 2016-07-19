@@ -1,13 +1,13 @@
 'use strict'
 
-const moment     = require('moment')
-    , listStream = require('list-stream')
-    , once       = require('once')
-    , db         = require('./db')
+var moment     = require('moment')
+  , listStream = require('list-stream')
+  , once       = require('once')
+  , db         = require('./db')
 
 
 function pkgRank (pkg, callback) {
-  db.packageDb.get(pkg, (err, data) => {
+  db.packageDb.get(pkg, function afterGet (err, data) {
     if (err) {
       if (err.notFound)
         return callback(null, '')
@@ -20,7 +20,7 @@ function pkgRank (pkg, callback) {
 
 
 function pkgDownloadDays (pkg, days, callback) {
-  let pkgCountDb   = db.packageCountDb(pkg)
+  var pkgCountDb   = db.packageCountDb(pkg)
     , start        = moment()
                       .utcOffset(0)
                       .subtract(days + 1, 'days')
@@ -35,7 +35,7 @@ function pkgDownloadDays (pkg, days, callback) {
     if (err)
       return callback(err)
 
-    data = data.map((d) => ({ day: d.key, count: parseInt(d.value, 10) }))
+    data = data.map(function m (d) { return { day: d.key, count: parseInt(d.value, 10) } })
 
     callback(null, data)
   }
@@ -49,11 +49,13 @@ function pkgDownloadDays (pkg, days, callback) {
 
 
 function pkgDownloadSum (pkg, days, callback) {
-  pkgDownloadDays(pkg, days, (err, data) => {
+  pkgDownloadDays(pkg, days, function afterDays (err, data) {
+    var sum
+
     if (err)
       return callback(err)
 
-    let sum = data.reduce((p, c) => p + c.count, 0)
+    sum = data.reduce(function r (p, c) { return p + c.count }, 0)
 
     callback(null, sum)
   })
@@ -61,7 +63,7 @@ function pkgDownloadSum (pkg, days, callback) {
 
 
 function topDownloads (count, callback) {
-  let date   = moment()
+  var date   = moment()
                 .utcOffset(0)
                 .subtract(1, 'days')
                 .format('YYYY-MM-DD')
@@ -70,11 +72,12 @@ function topDownloads (count, callback) {
   function onErrorOrEnd (err, data) {
     if (!callback)
       return
-    if (err) {
+    if (err)
       callback(err)
-    } else if (data) {
-      data = data.map((_d, i) => {
-        let d = JSON.parse(_d)
+    else if (data) {
+      data = data.map(function m (_d, i) {
+        var d = JSON.parse(_d)
+
         d.rank = i + 1
         return d
       })
@@ -91,7 +94,40 @@ function topDownloads (count, callback) {
 }
 
 
+function totalDownloads (callback) {
+  var date   = moment()
+                .utcOffset(0)
+                .subtract(1, 'days')
+                .format('YYYY-MM-DD')
+    , dsumDb = db.dateSumDb(date)
+    , total  = 0
+    , pkgs   = 0
+
+  function onErrorOrEnd (err) {
+    if (!callback)
+      return
+
+    if (err)
+      callback(err)
+    else
+      callback(null, { total: total, 'packages': pkgs })
+    callback = null
+  }
+
+  dsumDb
+    .createValueStream()
+    .on('error', onErrorOrEnd)
+    .on('data', function onData (value) {
+      pkgs++
+      total += JSON.parse(value).count
+    })
+    .on('error', onErrorOrEnd)
+    .on('end', onErrorOrEnd)
+}
+
+
 module.exports.pkgRank         = pkgRank
 module.exports.pkgDownloadDays = pkgDownloadDays
 module.exports.pkgDownloadSum  = pkgDownloadSum
 module.exports.topDownloads    = topDownloads
+module.exports.totalDownloads  = totalDownloads

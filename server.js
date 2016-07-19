@@ -1,53 +1,55 @@
 'use strict'
 
-const http           = require('http')
-    , fs             = require('fs')
-    , url            = require('url')
-    , querystring    = require('querystring')
-    , Router         = require('routes-router')
-    , bole           = require('bole')
-    , uuid           = require('node-uuid')
-    , sendJson       = require('send-data/json')
-    , sendPlain      = require('send-data/plain')
-    , sendError      = require('send-data/error')
-    , api            = require('./api')
+var http           = require('http')
+  , fs             = require('fs')
+  , url            = require('url')
+  , querystring    = require('querystring')
+  , Router         = require('routes-router')
+  , bole           = require('bole')
+  , uuid           = require('node-uuid')
+  , sendJson       = require('send-data/json')
+  , sendPlain      = require('send-data/plain')
+  , sendError      = require('send-data/error')
+  , api            = require('./api')
 
-    , log            = bole('server')
-    , reqLog         = bole('server:request')
+  , log            = bole('server')
+  , reqLog         = bole('server:request')
 
-    , isDev          = (/^dev/i).test(process.env.NODE_ENV)
-    , port           = process.env.PORT || 3000
-    , start          = new Date()
+  , isDev          = (/^dev/i).test(process.env.NODE_ENV)
+  , port           = process.env.PORT || 3000
+  , start          = new Date()
 
 
-    // inherited from nodei.co/lib/valid-name.js
-    , pkgregex       = '@?\\w*/?[^/@\\s\\+%:]+'
-
+  // inherited from nodei.co/lib/valid-name.js
+  , pkgregex       = '@?\\w*/?[^/@\\s\\+%:]+'
+  , router
 
 bole.output({
-  level  : isDev ? 'debug' : 'info',
-  stream : process.stdout
+    level  : isDev ? 'debug' : 'info'
+  , stream : process.stdout
 })
 
 if (process.env.LOG_FILE) {
-  console.log(`Starting logging to ${process.env.LOG_FILE}`)
+  console.log('Starting logging to ' + process.env.LOG_FILE)
   bole.output({
-    level  : 'debug',
-    stream : fs.createWriteStream(process.env.LOG_FILE)
+      level  : 'debug'
+    , stream : fs.createWriteStream(process.env.LOG_FILE)
   })
 }
 
+if (process.env.NODE_TITLE)
+  process.title = process.env.NODE_TITLE
 
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', function ue (err) {
   log.error(err)
   process.exit(1)
 })
 
 
 function sendData (req, res) {
-  return function (err, data) {
+  return function send (err, data) {
     if (err)
-      return sendError(req, res)
+      return sendError(req, res, { body: err })
 
     sendJson(req, res, { body: data, statusCode: 200 })
   }
@@ -61,11 +63,13 @@ function pkgRankRoute (req, res, opts) {
 
 
 function _pkgDownloadsPreRoute (req, res, opts, route) {
-  let qs   = querystring.parse(url.parse(req.url).query)
+  var qs   = querystring.parse(url.parse(req.url).query)
     , days = parseInt(qs.days || 30, 10)
 
-  if (days < 1 || days > 365)
+  if (days < 1)
     days = 30
+  else if (days > 366)
+    days = 365
 
   opts.days = days
 
@@ -75,21 +79,21 @@ function _pkgDownloadsPreRoute (req, res, opts, route) {
 
 
 function pkgDownloadSumRoute (req, res, opts) {
-  _pkgDownloadsPreRoute(req, res, opts, function () {
+  _pkgDownloadsPreRoute(req, res, opts, function preRoute () {
     api.pkgDownloadSum(opts.params.pkg, opts.days, sendData(req, res))
   })
 }
 
 
 function pkgDownloadDaysRoute (req, res, opts) {
-  _pkgDownloadsPreRoute(req, res, opts, function () {
+  _pkgDownloadsPreRoute(req, res, opts, function preRoute () {
     api.pkgDownloadDays(opts.params.pkg, opts.days, sendData(req, res))
   })
 }
 
 
 function topDownloadsRoute (req, res) {
-  let qs    = querystring.parse(url.parse(req.url).query)
+  var qs    = querystring.parse(url.parse(req.url).query)
     , count = parseInt(qs.count || 50, 10)
 
   if (count < 1 || count > 500)
@@ -100,13 +104,19 @@ function topDownloadsRoute (req, res) {
 }
 
 
-const router = Router({
-    errorHandler: function (req, res, err) {
+function totalDownloadsRoute (req, res) {
+  res.setHeader('cache-control', 'no-cache')
+  api.totalDownloads(sendData(req, res))
+}
+
+
+router = Router({
+    errorHandler: function errorHandler (req, res, err) {
       req.log.error(err)
-      sendError(req, res, err)
+      sendError(req, res, { body: err })
     }
 
-  , notFound: function (req, res) {
+  , notFound: function notFound (req, res) {
       sendJson(req, res, {
           body: { 'error': 'Not found: ' + req.url }
         , statusCode: 404
@@ -115,10 +125,11 @@ const router = Router({
 })
 
 
-router.addRoute(`/rank/:pkg(${pkgregex})`          , pkgRankRoute)
-router.addRoute(`/download-sum/:pkg(${pkgregex})`  , pkgDownloadSumRoute)
-router.addRoute(`/download-days/:pkg(${pkgregex})` , pkgDownloadDaysRoute)
-router.addRoute('/top'                             , topDownloadsRoute)
+router.addRoute('/rank/:pkg(' + pkgregex + ')'          , pkgRankRoute)
+router.addRoute('/download-sum/:pkg(' + pkgregex + ')'  , pkgDownloadSumRoute)
+router.addRoute('/download-days/:pkg(' + pkgregex + ')' , pkgDownloadDaysRoute)
+router.addRoute('/top'                                  , topDownloadsRoute)
+router.addRoute('/total'                                , totalDownloadsRoute)
 
 
 function handler (req, res) {
@@ -137,17 +148,17 @@ function handler (req, res) {
 
 
 http.createServer(handler)
-  .on('error', (err) => {
+  .on('error', function onError (err) {
     log.error(err)
     throw err
   })
-  .listen(port, (err) => {
+  .listen(port, function afterListen (err) {
     if (err) {
       log.error(err)
       throw err
     }
 
-    log.info(`Server started on port ${port}`)
+    log.info('Server started on port ' + port)
     console.log()
     console.log('>> Running: http://localhost:' + port)
     console.log()

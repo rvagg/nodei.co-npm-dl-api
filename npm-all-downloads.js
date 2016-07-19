@@ -1,18 +1,18 @@
 'use strict'
 
-const moment         = require('moment')
-    , through2       = require('through2')
-    , log            = require('bole')('npm-all-downloads')
-    , db             = require('./db')
-    , calculateRanks = require('./calculate-ranks')
-    , processPackage = require('./process-package')
+var moment         = require('moment')
+  , through2       = require('through2')
+  , log            = require('bole')('npm-all-downloads')
+  , db             = require('./db')
+  , calculateRanks = require('./calculate-ranks')
+  , processPackage = require('./process-package')
 
 
 function processAllPackages (callback) {
-  let date = new Date()
+  var date = new Date()
 
   function clean (callback) {
-    let end    = moment(date)
+    var end    = moment(date)
                   .utcOffset(0)
                   .subtract(1, 'days')
                   .format('YYYY-MM-DD')
@@ -20,19 +20,19 @@ function processAllPackages (callback) {
       , batch  = []
 
     dsumDb.createKeyStream()
-      .on('data', (key) => batch.push({ type: 'del', key: key }))
-      .on('end', () => {
-        log.debug(`Deleting ${batch.length} entries from sum database @ ${end}`)
+      .on('data', function onData (key) { batch.push({ type: 'del', key: key }) })
+      .on('end', function onEnd () {
+        log.debug('Deleting ' + batch.length + ' entries from sum database @ ' + end)
         dsumDb.batch(batch, callback)
       })
   }
 
   function run () {
-    let processed    = 0
+    var processed    = 0
       , packageCount = 0
 
     function onPackage (pkg, enc, _callback) {
-      let self = this
+      var self = this
 
       packageCount++
 
@@ -41,9 +41,9 @@ function processAllPackages (callback) {
       function afterProcess (err, count) {
         processed++
 
-        if (err) {
+        if (err)
           log.error(err)
-        } else {
+        else {
           log.debug({
               number: processed
             , 'package': pkg
@@ -65,11 +65,10 @@ function processAllPackages (callback) {
     function onEnd (_callback) {
       if (callback)
         calculateRanks(date, packageCount, callback)
-
       _callback()
     }
 
-    db.packageDb.createKeyStream()
+    db.packageDb.createKeyStream({ lt: '~' })
       .pipe(through2.obj(onPackage, onEnd))
   }
 
@@ -81,8 +80,8 @@ module.exports.processAllPackages = processAllPackages
 
 if (require.main === module) {
 require('bole').output({
-  level  : process.env.NODE_ENV == 'development' ? 'debug' : 'info',
-  stream : process.stdout
+    level  : process.env.NODE_ENV == 'development' ? 'debug' : 'info'
+  , stream : process.stdout
 })
-  processAllPackages(() => {})
+  processAllPackages(function afterAll () {})
 }

@@ -1,12 +1,13 @@
 'use strict'
 
-const hyperquest = require('hyperquest')
-    , bl         = require('bl')
-    , fs         = require('fs')
+var hyperquest = require('hyperquest')
+  , path       = require('path')
+  , bl         = require('bl')
+  , fs         = require('fs')
 
 
-const allPackagesUrl = 'https://registry.npmjs.org/-/all/static/all.json?limit=1000'
-    , debugSource    = `${__dirname}/all.json`
+var allPackagesUrl = 'https://registry.npmjs.org/-/all/static/all.json?limit=1000'
+  , debugSource    = path.join(__dirname, '/all.json')
 
 
 // load the list of all npm libs with 'repo' pointing to GitHub
@@ -17,11 +18,11 @@ function listPackages (callback) {
     return hyperquest(allPackagesUrl)
   }
 
-  source().pipe(bl((err, data) => {
+  source().pipe(bl(function afterPipe (err, data) {
+    var packages, names
+
     if (err)
       return callback(err)
-
-    let packages
 
     try {
       packages = JSON.parse(data.toString())
@@ -29,8 +30,9 @@ function listPackages (callback) {
       return  callback(e)
     }
 
-    let names = Object.keys(packages).filter((name) => {
-      let versions = packages[name].versions
+    names = Object.keys(packages).filter(function f (name) {
+      var versions = packages[name].versions
+
       return versions && Object.keys(versions).length > 0
     })
 
@@ -42,5 +44,10 @@ function listPackages (callback) {
 module.exports = listPackages
 
 
-if (require.main === module)
-  listPackages((err, names) => console.log(`${names.length} packages`))
+if (require.main === module) {
+  listPackages(function afterList (err, names) {
+    if (err)
+      throw err
+    console.log('' + names.length + ' packages')
+  })
+}

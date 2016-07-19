@@ -4,7 +4,10 @@
   "description": "https://nodei.co - Node.js badges, that's all",
   "main": "server.js",
   "author": "Rod Vagg <r@va.gg> (https://github.com/rvagg)",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "eslint *.js"
+  },
   "dependencies": {
     "after": "~0.8.1",
     "bl": "~1.0.0",
@@ -18,6 +21,7 @@
     "moment": "~2.10.6",
     "node-uuid": "~1.4.3",
     "npm-download-counts": "~0.1.1",
+    "npm-download-db": "~1.0.0",
     "once": "~1.3.2",
     "routes-router": "~4.2.0",
     "send-data": "~7.0.0",
@@ -25,6 +29,7 @@
   },
   "private": true,
   "devDependencies": {
-    "bistre": "~1.0.0"
+    "bistre": "~1.0.0",
+    "eslint": "~3.1.1"
   }
 }

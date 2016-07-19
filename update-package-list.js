@@ -1,13 +1,13 @@
 'use strict'
 
-const log          = require('bole')('process-packages')
-    , listPackages = require('./npm-list-packages')
-    , db           = require('./db')
+var log          = require('bole')('process-packages')
+  , listPackages = require('./npm-list-packages')
+  , db           = require('./db')
 
 
 function updatePackageList (callback) {
   function savePackage (pkg, callback) {
-    db.packageDb.get(pkg, (err) => {
+    db.packageDb.get(pkg, function afterGet (err) {
       if (err && err.notFound)
         return db.packageDb.put(pkg, '{}', callback)
       callback(err)
@@ -16,17 +16,17 @@ function updatePackageList (callback) {
 
   log.debug('Updating package list from npm')
 
-  listPackages((err, names) => {
+  listPackages(function afterList (err, names) {
+    var i = 0
+
     if (err)
       log.error(err)
     else
       log.debug('Completed package list update from npm')
 
-    let i = 0
-
     function save (err) {
       if (err)
-        throw new Error(`Error saving package ${err.message}`)
+        throw new Error('Error saving package ' + err.message)
 
       if (++i == names.length)
         return callback()
@@ -42,4 +42,4 @@ function updatePackageList (callback) {
 module.exports = updatePackageList
 
 if (require.main === module)
-  updatePackageList(() => {})
+  updatePackageList(function upl () {})
