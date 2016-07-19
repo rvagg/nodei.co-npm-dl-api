@@ -1,67 +1,46 @@
 'use strict'
 
 var moment     = require('moment')
-  , listStream = require('list-stream')
-  , once       = require('once')
   , db         = require('./db')
 
 
 function pkgRank (pkg, callback) {
-  db.packageDb.get(pkg, function afterGet (err, data) {
+  db.packageRank(pkg, function afterGet (err, data) {
     if (err) {
       if (err.notFound)
         return callback(null, '')
       return callback(err)
     }
 
-    callback(null, JSON.parse(data))
+    if (moment(data.day) < moment().add(-3, 'days'))
+      console.error('warning, ranking data for [' + pkg + '] is stale, from ' + data.day)
+
+    callback(null, data.rank)
   })
 }
 
 
-function pkgDownloadDays (pkg, days, callback) {
-  var pkgCountDb   = db.packageCountDb(pkg)
-    , start        = moment()
-                      .utcOffset(0)
+function _pkgDownloadRangeFunction (fn, pkg, days, callback) {
+  var start        = moment().utc()
                       .subtract(days + 1, 'days')
                       .format('YYYY-MM-DD')
-    , end          = moment()
-                      .utcOffset(0)
+    , end          = moment().utc(0)
                       .subtract(1, 'days')
                       .format('YYYY-MM-DD')
-    , onErrorOrEnd = once(_onErrorOrEnd)
 
-  function _onErrorOrEnd (err, data) {
-    if (err)
-      return callback(err)
+  db[fn](pkg, start, end, callback)
+}
 
-    data = data.map(function m (d) { return { day: d.key, count: parseInt(d.value, 10) } })
-
-    callback(null, data)
-  }
-
-  pkgCountDb
-    .createReadStream({ gte: start, lt: end })
-    .on('error', onErrorOrEnd)
-    .pipe(listStream.obj(onErrorOrEnd))
-    .on('error', onErrorOrEnd)
+function pkgDownloadDays (pkg, days, callback) {
+  return _pkgDownloadRangeFunction('packageCounts', pkg, days, callback)
 }
 
 
 function pkgDownloadSum (pkg, days, callback) {
-  pkgDownloadDays(pkg, days, function afterDays (err, data) {
-    var sum
-
-    if (err)
-      return callback(err)
-
-    sum = data.reduce(function r (p, c) { return p + c.count }, 0)
-
-    callback(null, sum)
-  })
+  return _pkgDownloadRangeFunction('packageCount', pkg, days, callback)
 }
 
-
+/*
 function topDownloads (count, callback) {
   var date   = moment()
                 .utcOffset(0)
@@ -124,10 +103,11 @@ function totalDownloads (callback) {
     .on('error', onErrorOrEnd)
     .on('end', onErrorOrEnd)
 }
+*/
 
 
 module.exports.pkgRank         = pkgRank
 module.exports.pkgDownloadDays = pkgDownloadDays
 module.exports.pkgDownloadSum  = pkgDownloadSum
-module.exports.topDownloads    = topDownloads
-module.exports.totalDownloads  = totalDownloads
+// module.exports.topDownloads    = topDownloads
+// module.exports.totalDownloads  = totalDownloads

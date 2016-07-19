@@ -1,29 +1,4 @@
-var level  = require('level')
-  , spaces = require('level-spaces')
+var level          = require('level')
+  , NpmDownloadsDb = require('npm-download-db')
 
-
-var db        = level('./counts.db', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
-  , packageDb = spaces(db, 'package', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
-  , countDb   = spaces(db, 'count', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
-  , sumDb     = spaces(db, 'sum', { keyEncoding: 'utf8', valueEncoding: 'utf8' })
-
-
-module.exports.db        = db
-module.exports.packageDb = packageDb
-module.exports.countDb   = countDb
-module.exports.sumDb     = sumDb
-
-
-module.exports.packageCountDb = function packageCountDb (pkg) {
-  return spaces(countDb, pkg)
-}
-
-
-module.exports.dateSumDb = function dateSumDb (date) {
-  return spaces(sumDb, date)
-}
-
-
-module.exports.packageDateDb = function packageDateDb (date) {
-  return spaces(packageDb, date)
-}
+module.exports = new NpmDownloadsDb(level('./counts.db'))

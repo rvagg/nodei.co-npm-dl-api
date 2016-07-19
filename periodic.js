@@ -1,33 +1,32 @@
 'use strict'
 
-var updaterLog       = require('bole')('updater')
-  , updatePackages   = require('./update-package-list')
-  , allDownloads     = require('./npm-all-downloads')
+var updaterLog = require('bole')('updater')
+  , moment     = require('moment')
+  , db         = require('./db')
   , periodicInterval = 1000 * 60 * 60 * 12
 
 // TODO: avoid overlap of periodic jobs
 setInterval(periodic, periodicInterval)
-setTimeout(periodic, 1000)// * 60)
+setTimeout(periodic.bind(null, true), 1000)
 
 
-function periodic () {
-  var start = Date.now()
+function periodic (first) {
+  var start   = Date.now()
+    , options = {}
 
   updaterLog.info('Starting periodic update')
 
-  updatePackages(function afterUpdate (err) {
-    if (err) {
-      updaterLog.error(err)
-      return process.exit(1)
-    }
+  // only collect the full data set on the first run of this instance, otherwise just go back a month
+  if (!first)
+    options.start = moment.utc().add(-1, 'month').toDate()
 
-    allDownloads.processAllPackages(function afterProcess (err) {
-      if (err) {
-        updaterLog.error(err)
-        return process.exit(1)
-      }
-
-      updaterLog.info('Finished periodic update, took ' + (Date.now() - start) + ' seconds')
+  db.update(options)
+  db.once('updated', function onUpdated () {
+    updaterLog.info('Finished periodic update, took ' + (Date.now() - start) + ' seconds')
+    start = Date.now()
+    db.rank()
+    db.once('ranked', function onRanked () {
+      updaterLog.info('Finished periodic rank, took ' + (Date.now() - start) + ' seconds')
     })
   })
 }
