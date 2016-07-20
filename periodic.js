@@ -22,11 +22,12 @@ function periodic (first) {
 
   db.update(options)
   db.once('updated', function onUpdated () {
-    updaterLog.info('Finished periodic update, took ' + (Date.now() - start) + ' seconds')
+    updaterLog.info('Finished periodic update, took ' + ((Date.now() - start) / 1000) + ' seconds')
     start = Date.now()
+    updaterLog.info('Starting periodic rank')
     db.rank()
     db.once('ranked', function onRanked () {
-      updaterLog.info('Finished periodic rank, took ' + (Date.now() - start) + ' seconds')
+      updaterLog.info('Finished periodic rank, took ' + ((Date.now() - start) / 1000) + ' seconds')
     })
   })
 }

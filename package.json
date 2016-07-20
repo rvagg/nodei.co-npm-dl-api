@@ -14,7 +14,7 @@
     "level": "~1.4.0",
     "moment": "~2.14.1",
     "node-uuid": "~1.4.7",
-    "npm-download-db": "~1.2.0",
+    "npm-download-db": "~1.2.1",
     "routes-router": "~4.2.1",
     "send-data": "~8.0.0"
   },

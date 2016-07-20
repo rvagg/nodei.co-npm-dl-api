@@ -5,6 +5,8 @@ var moment     = require('moment')
 
 
 function pkgRank (pkg, callback) {
+  var allPackageCount = db.allPackages && db.allPackages.length
+
   db.packageRank(pkg, function afterGet (err, data) {
     if (err) {
       if (err.notFound)
@@ -15,7 +17,7 @@ function pkgRank (pkg, callback) {
     if (moment(data.day) < moment().add(-3, 'days'))
       console.error('warning, ranking data for [' + pkg + '] is stale, from ' + data.day)
 
-    callback(null, { rank: data.rank, total: data.packageCount })
+    callback(null, { rank: data.rank, total: data.packageCount || allPackageCount})
   })
 }
 
