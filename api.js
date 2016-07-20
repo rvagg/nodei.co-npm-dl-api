@@ -15,7 +15,7 @@ function pkgRank (pkg, callback) {
     if (moment(data.day) < moment().add(-3, 'days'))
       console.error('warning, ranking data for [' + pkg + '] is stale, from ' + data.day)
 
-    callback(null, data.rank)
+    callback(null, { rank: data.rank, total: data.packageCount })
   })
 }
 
