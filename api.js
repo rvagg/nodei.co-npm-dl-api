@@ -4,9 +4,18 @@ var moment     = require('moment')
   , db         = require('./db')
 
 
-function pkgRank (pkg, callback) {
-  var allPackageCount = db.allPackages && db.allPackages.length
+function transformRankData (data) {
+  return {
+      rank           : data.rank
+    , date           : data.day
+    , total          : data.packageCount || (db.allPackages && db.allPackages.length)
+    , downloads      : data.count
+    , totalDownloads : db.periodAllTotal
+  }
+}
 
+
+function pkgRank (pkg, callback) {
   db.packageRank(pkg, function afterGet (err, data) {
     if (err) {
       if (err.notFound)
@@ -17,7 +26,7 @@ function pkgRank (pkg, callback) {
     if (moment(data.day) < moment().add(-3, 'days'))
       console.error('warning, ranking data for [' + pkg + '] is stale, from ' + data.day)
 
-    callback(null, { rank: data.rank, total: data.packageCount || allPackageCount})
+    callback(null, transformRankData(data))
   })
 }
 
@@ -42,74 +51,28 @@ function pkgDownloadSum (pkg, days, callback) {
   return _pkgDownloadRangeFunction('packageCount', pkg, days, callback)
 }
 
-/*
 function topDownloads (count, callback) {
-  var date   = moment()
-                .utcOffset(0)
-                .subtract(1, 'days')
-                .format('YYYY-MM-DD')
-    , dsumDb = db.dateSumDb(date)
-
-  function onErrorOrEnd (err, data) {
-    if (!callback)
-      return
+  return db.topPackages(count, function afterTop (err, data) {
     if (err)
-      callback(err)
-    else if (data) {
-      data = data.map(function m (_d, i) {
-        var d = JSON.parse(_d)
+      return callback(err)
 
-        d.rank = i + 1
-        return d
-      })
-      callback(null, data)
-    }
-    callback = null
-  }
-
-  dsumDb
-    .createValueStream({ reverse: true, limit: count })
-    .on('error', onErrorOrEnd)
-    .pipe(listStream.obj(onErrorOrEnd))
-    .on('error', onErrorOrEnd)
+    callback(null, data.map(transformRankData))
+  })
 }
 
 
 function totalDownloads (callback) {
-  var date   = moment()
-                .utcOffset(0)
-                .subtract(1, 'days')
-                .format('YYYY-MM-DD')
-    , dsumDb = db.dateSumDb(date)
-    , total  = 0
-    , pkgs   = 0
-
-  function onErrorOrEnd (err) {
-    if (!callback)
-      return
-
-    if (err)
-      callback(err)
-    else
-      callback(null, { total: total, 'packages': pkgs })
-    callback = null
-  }
-
-  dsumDb
-    .createValueStream()
-    .on('error', onErrorOrEnd)
-    .on('data', function onData (value) {
-      pkgs++
-      total += JSON.parse(value).count
+  setImmediate(function i () {
+    callback(null, {
+        total    : db.periodAllTotal
+      , packages : db.allPackages && db.allPackages.length
     })
-    .on('error', onErrorOrEnd)
-    .on('end', onErrorOrEnd)
+  })
 }
-*/
 
 
 module.exports.pkgRank         = pkgRank
 module.exports.pkgDownloadDays = pkgDownloadDays
 module.exports.pkgDownloadSum  = pkgDownloadSum
-// module.exports.topDownloads    = topDownloads
-// module.exports.totalDownloads  = totalDownloads
+module.exports.topDownloads    = topDownloads
+module.exports.totalDownloads  = totalDownloads

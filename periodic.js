@@ -18,7 +18,7 @@ function periodic (first) {
 
   // only collect the full data set on the first run of this instance, otherwise just go back a month
   if (!first)
-    options.start = moment.utc().add(-1, 'month').toDate()
+    options.start = moment.utc().add(-7, 'days').toDate()
 
   db.update(options)
   db.once('updated', function onUpdated () {
